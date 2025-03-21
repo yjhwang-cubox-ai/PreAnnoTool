@@ -1,11 +1,33 @@
-import streamlit as st
+# import asyncio
+
+# try:
+#     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# except (AttributeError, ImportError):
+#     pass
+# PyTorch 모듈 감시 비활성화 설정
 import os
+os.environ["PYTHONPATH"] = os.getcwd()
+os.environ["STREAMLIT_WATCH_MODULE_PATHS"] = "false"
+
+import asyncio
+try:
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+except (AttributeError, ImportError):
+    pass
+from ocr_model import perform_ocr
+import streamlit as st
+
+
+from ocr_model import perform_ocr
+import streamlit as st
 import json
 import tempfile
 from PIL import Image, ImageDraw
 import numpy as np
 from datetime import datetime
-from ocr_model import perform_ocr
+
+
+
 
 # 페이지 설정
 st.set_page_config(
@@ -28,6 +50,30 @@ if 'original_image' not in st.session_state:
 if 'edited_values' not in st.session_state:
     st.session_state.edited_values = {}
 
+def parse_ocr_result(ocr_string):
+    """
+    OCR 결과 문자열을 파싱하여 딕셔너리로 변환합니다.
+    
+    Args:
+        ocr_string (str): OCR 결과 문자열
+        
+    Returns:
+        dict: 파싱된 키-값 쌍
+    """
+    result_dict = {}
+    lines = ocr_string.split('<')
+    
+    for line in lines:
+        if '>' in line:
+            key_value = line.split('>')
+            key = key_value[0].strip()
+            value = key_value[1].strip() if len(key_value) > 1 else ''
+            result_dict[key] = value
+            
+    return result_dict
+
+
+
 # 제목
 st.title("OCR Pre-annotation Tool")
 st.markdown("사업자등록증 이미지를 업로드하고 OCR 결과를 확인 및 수정할 수 있습니다.")
@@ -47,9 +93,16 @@ with st.sidebar:
         st.session_state.temp_image_path = temp_file.name
         temp_file.close()
         
-        # 이미지 표시
+        # 이미지 표시        
         st.session_state.original_image = Image.open(st.session_state.temp_image_path)
+        # 이미지 고정된 열
+
+        # # 고정 이미지
+        # original_image = Image.open(temp_file.name)
+        # st.sidebar.header("원본 이미지")
+        # st.sidebar.image(original_image, use_container_width=True)
         
+
         # OCR 처리 버튼
         if st.button("OCR 처리 시작"):
             with st.spinner("OCR 처리 중..."):
@@ -74,51 +127,53 @@ with col1:
     st.header("원본 이미지")
     if st.session_state.original_image is not None:
         # 이미지 표시
-        st.image(st.session_state.original_image, use_column_width=True)
+        # st.image(original_image, use_container_width=True)
+        st.image(st.session_state.original_image, use_container_width=True)
         
-        # 바운딩 박스가 있는 이미지 표시 옵션
-        if st.session_state.ocr_results is not None:
-            if st.checkbox("바운딩 박스 표시", value=True):
-                # 바운딩 박스 그리기
-                img_with_boxes = st.session_state.original_image.copy()
-                draw = ImageDraw.Draw(img_with_boxes)
+        # # 바운딩 박스가 있는 이미지 표시 옵션
+        # if st.session_state.ocr_results is not None:
+        #     if st.checkbox("바운딩 박스 표시", value=True):
+        #         # 바운딩 박스 그리기
+        #         img_with_boxes = st.session_state.original_image.copy()
+        #         draw = ImageDraw.Draw(img_with_boxes)
                 
-                for result in st.session_state.ocr_results:
-                    bbox = result['bbox']
-                    # 박스 그리기
-                    draw.rectangle(
-                        [(bbox[0], bbox[1]), (bbox[2], bbox[3])],
-                        outline="red",
-                        width=2
-                    )
-                    # ID 텍스트 추가
-                    draw.text((bbox[0], bbox[1] - 15), f"ID: {result['id']}", fill="red")
+        #         for result in st.session_state.ocr_results:
+        #             bbox = result['bbox']
+        #             # 박스 그리기
+        #             draw.rectangle(
+        #                 [(bbox[0], bbox[1]), (bbox[2], bbox[3])],
+        #                 outline="red",
+        #                 width=2
+        #             )
+        #             # ID 텍스트 추가
+        #             draw.text((bbox[0], bbox[1] - 15), f"ID: {result['id']}", fill="red")
                 
-                st.image(img_with_boxes, use_column_width=True, caption="바운딩 박스가 표시된 이미지")
+        #         st.image(img_with_boxes, use_container_width=True, caption="바운딩 박스가 표시된 이미지")
 
 # 오른쪽 컬럼 - OCR 결과 및 수정
 with col2:
     st.header("OCR 결과")
     
     if st.session_state.ocr_results is not None:
+        # OCR 결과 문자열을 파싱
+        ocr_string = st.session_state.ocr_results  # OCR 결과 문자열
+        parsed_results = parse_ocr_result(ocr_string)
+        
         # 각 결과에 대한 편집 가능한 텍스트 필드 표시
-        for i, result in enumerate(st.session_state.ocr_results):
-            result_id = result['id']
-            confidence = result['confidence']
-            
+        for key, value in parsed_results.items():
             # 컨테이너로 각 결과 묶기
             with st.container():
-                st.markdown(f"**항목 {i+1}** (ID: {result_id}, 신뢰도: {confidence}%)")
+                st.markdown(f"**{key}**")
                 
                 # 텍스트 수정 입력창
-                edited_text = st.text_input(
-                    f"인식된 텍스트 {i+1}",
-                    value=st.session_state.edited_values.get(result_id, result['text']),
-                    key=f"text_{result_id}"
+                edited_value = st.text_input(
+                    f"{key} 수정",
+                    value=value,
+                    key=f"edit_{key}"
                 )
                 
                 # 세션 상태에 수정된 값 저장
-                st.session_state.edited_values[result_id] = edited_text
+                st.session_state.edited_values[key] = edited_value
                 
                 st.markdown("---")
         
@@ -127,35 +182,19 @@ with col2:
             try:
                 annotations = []
                 
-                for result in st.session_state.ocr_results:
-                    result_id = result['id']
-                    original_text = result['text']
-                    modified_text = st.session_state.edited_values.get(result_id, original_text)
-                    
+                for key, modified_text in st.session_state.edited_values.items():
                     annotations.append({
-                        'id': result_id,
-                        'original_text': original_text,
-                        'modified_text': modified_text,
-                        'confidence': result['confidence'],
-                        'bbox': result['bbox'],
-                        'modified': (original_text != modified_text)
+                        'key': key,
+                        'modified_text': modified_text
                     })
                 
-                # 이미지 파일명 가져오기
-                original_filename = os.path.basename(uploaded_file.name)
-                base_filename = os.path.splitext(original_filename)[0]
-                
-                # 타임스탬프 추가
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                output_filename = f"{base_filename}_annotation_{timestamp}.json"
+                # JSON 파일로 저장
+                output_filename = "ocr_annotations.json"
                 output_path = os.path.join(ANNOTATION_DIR, output_filename)
                 
-                # JSON 파일로 저장
                 with open(output_path, 'w', encoding='utf-8') as f:
                     json.dump({
-                        'image_filename': original_filename,
-                        'annotations': annotations,
-                        'timestamp': timestamp
+                        'annotations': annotations
                     }, f, ensure_ascii=False, indent=2)
                 
                 st.success(f"어노테이션이 저장되었습니다. 파일 위치: {output_path}")
