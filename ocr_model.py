@@ -54,42 +54,5 @@ def perform_ocr(image_path):
     sequence = processor.batch_decode(outputs.sequences)[0]
     sequence = sequence.replace(processor.tokenizer.eos_token, "").replace(processor.tokenizer.pad_token, "")
     sequence = re.sub(r"<.*?>", "", sequence, count=1).strip()  # remove first task start token
-
-
-    # 아래는 테스트용 샘플 데이터입니다
-    
-    # 예시 데이터
-    sample_results = [
-        {
-            'id': '1',
-            'text': '사업자등록증',
-            'confidence': 95,
-            'bbox': [100, 50, 300, 80]
-        },
-        {
-            'id': '2',
-            'text': '등록번호: 123-45-67890',
-            'confidence': 92,
-            'bbox': [100, 100, 400, 130]
-        },
-        {
-            'id': '3',
-            'text': '상호: 예시회사',
-            'confidence': 88,
-            'bbox': [100, 150, 350, 180]
-        },
-        {
-            'id': '4',
-            'text': '대표자: 홍길동',
-            'confidence': 90,
-            'bbox': [100, 200, 350, 230]
-        },
-        {
-            'id': '5',
-            'text': '주소: 서울시 강남구 테헤란로 123',
-            'confidence': 85,
-            'bbox': [100, 250, 500, 280]
-        }
-    ]
     
     return sequence
