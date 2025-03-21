@@ -21,7 +21,6 @@ def perform_ocr(image_path):
                 'bbox': [x1, y1, x2, y2] (텍스트 영역의 좌표)
             }
     """
-    # 여기에 실제 OCR 모델 연동 코드를 구현하세요
     model_name = 'models/epoch-015_step-01008_ED-0.2259'
 
     processor = DonutProcessor.from_pretrained(model_name)
@@ -56,3 +55,31 @@ def perform_ocr(image_path):
     sequence = re.sub(r"<.*?>", "", sequence, count=1).strip()  # remove first task start token
     
     return sequence
+
+def parse_ocr_result(ocr_string):
+    """
+    OCR 결과 문자열을 파싱하여 딕셔너리로 변환합니다.
+    
+    Args:
+        ocr_string (str): OCR 결과 문자열
+        
+    Returns:
+        dict: 파싱된 키-값 쌍
+    """
+    result_dict = {}
+    
+    # 문자열을 '<'로 나누어 각 요소를 처리
+    elements = ocr_string.split('<')
+    
+    for element in elements:
+        # '>'가 있는 경우에만 처리
+        if '>' in element:
+            key_value = element.split('>')
+            key = key_value[0].strip()  # 키
+            value = key_value[1].strip() if len(key_value) > 1 else ''  # 값
+            
+            # 키가 비어있지 않고, 종료 태그가 아닌 경우에만 추가
+            if key and not key.startswith('/'):
+                result_dict[key] = value
+    
+    return result_dict

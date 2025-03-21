@@ -3,7 +3,7 @@ import os
 import streamlit as st
 import json
 import tempfile
-from ocr_model import perform_ocr
+from ocr_model import perform_ocr, parse_ocr_result
 from PIL import Image, ImageDraw
 import numpy as np
 from datetime import datetime
@@ -29,29 +29,6 @@ if 'original_image' not in st.session_state:
     st.session_state.original_image = None
 if 'edited_values' not in st.session_state:
     st.session_state.edited_values = {}
-
-def parse_ocr_result(ocr_string):
-    """
-    OCR 결과 문자열을 파싱하여 딕셔너리로 변환합니다.
-    
-    Args:
-        ocr_string (str): OCR 결과 문자열
-        
-    Returns:
-        dict: 파싱된 키-값 쌍
-    """
-    result_dict = {}
-    lines = ocr_string.split('<')
-    
-    for line in lines:
-        if '>' in line:
-            key_value = line.split('>')
-            key = key_value[0].strip()
-            value = key_value[1].strip() if len(key_value) > 1 else ''
-            result_dict[key] = value
-            
-    return result_dict
-
 
 # 제목
 st.title("OCR Pre-annotation Tool")
@@ -105,7 +82,6 @@ if st.session_state.ocr_results is not None:
     # OCR 결과 문자열을 파싱
     ocr_string = st.session_state.ocr_results  # OCR 결과 문자열
     parsed_results = parse_ocr_result(ocr_string)
-    
     # 각 결과에 대한 편집 가능한 텍스트 필드 표시
     for key, value in parsed_results.items():
         # 컨테이너로 각 결과 묶기
@@ -113,7 +89,7 @@ if st.session_state.ocr_results is not None:
             st.markdown(f"**{key}**")
             
             # 텍스트 수정 입력창
-            edited_value = st.text_input(
+            edited_value = st.text_area(
                 f"{key} 수정",
                 value=value,
                 key=f"edit_{key}"
@@ -136,8 +112,10 @@ if st.session_state.ocr_results is not None:
                 })
             
             # JSON 파일로 저장
-            output_filename = "ocr_annotations.json"
-            output_path = os.path.join(ANNOTATION_DIR, output_filename)
+            original_filename = uploaded_file.name  # 업로드한 파일의 이름
+            base_filename = os.path.splitext(original_filename)[0]  # 확장자를 제외한 파일 이름
+            output_filename = f"{base_filename}_annotations.json"  # JSON 파일 이름 생성
+            output_path = os.path.join(ANNOTATION_DIR, output_filename)  # 전체 경로 생성
             
             with open(output_path, 'w', encoding='utf-8') as f:
                 json.dump({
@@ -164,36 +142,3 @@ else:
         st.info("OCR 처리를 시작하려면 왼쪽 사이드바의 'OCR 처리 시작' 버튼을 클릭하세요.")
     else:
         st.info("이미지를 업로드하고 OCR 처리를 시작해주세요.")
-
-# col1, col2 = st.columns(2)
-
-# # 왼쪽 컬럼 - 이미지 표시
-# with col1:
-#     st.header("원본 이미지")
-#     if st.session_state.original_image is not None:
-#         # 이미지 표시
-#         st.image(st.session_state.original_image, use_container_width=True)
-        
-#         # # 바운딩 박스가 있는 이미지 표시 옵션
-#         # if st.session_state.ocr_results is not None:
-#         #     if st.checkbox("바운딩 박스 표시", value=True):
-#         #         # 바운딩 박스 그리기
-#         #         img_with_boxes = st.session_state.original_image.copy()
-#         #         draw = ImageDraw.Draw(img_with_boxes)
-                
-#         #         for result in st.session_state.ocr_results:
-#         #             bbox = result['bbox']
-#         #             # 박스 그리기
-#         #             draw.rectangle(
-#         #                 [(bbox[0], bbox[1]), (bbox[2], bbox[3])],
-#         #                 outline="red",
-#         #                 width=2
-#         #             )
-#         #             # ID 텍스트 추가
-#         #             draw.text((bbox[0], bbox[1] - 15), f"ID: {result['id']}", fill="red")
-                
-#         #         st.image(img_with_boxes, use_container_width=True, caption="바운딩 박스가 표시된 이미지")
-
-# # 오른쪽 컬럼 - OCR 결과 및 수정
-# with col2:
-    
